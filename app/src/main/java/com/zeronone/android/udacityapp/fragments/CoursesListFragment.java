@@ -1,8 +1,9 @@
 package com.zeronone.android.udacityapp.fragments;
 
+import android.app.ProgressDialog;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
-import android.support.v7.widget.CardView;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -17,6 +18,9 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.loopj.android.http.JsonHttpResponseHandler;
 import com.loopj.android.image.SmartImageView;
+import com.squareup.okhttp.OkHttpClient;
+import com.squareup.okhttp.Request;
+import com.squareup.okhttp.Response;
 import com.zeronone.android.udacityapp.R;
 import com.zeronone.android.udacityapp.models.Course;
 import com.zeronone.android.udacityapp.network.UdacityRestClass;
@@ -26,7 +30,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.lang.reflect.Array;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -71,17 +75,30 @@ public class CoursesListFragment extends Fragment {
         // TODO: Create RecycleView and Adapter Class for Course[]
         // TODO: Create Each Card Layout
         // TODO: Create Refresh Animation
+
+        OkHttpClient client = new OkHttpClient();
+
+
+//
         try {
-            UdacityRestClassUsage client = new UdacityRestClassUsage();
-            client.getAllCourses();
+            UdacityRestClassUsage clientClass = new UdacityRestClassUsage();
+           run(UdacityRestClass.getAbsoluteUrl("courses"), client);
 
-
-        } catch (JSONException e) {
+//          client.getAllCourses();
+//
+//
+        } catch (IOException e) {
             Log.e(LOG_TAG, "Json Error Occurred");
 
         }
 
         return rootView;
+    }
+
+    private void run(String url, OkHttpClient client) throws IOException {
+
+        new FetchWeatherTask().execute(client);
+
     }
 
     public class CourseAdapter extends RecyclerView.Adapter<CourseAdapter.ViewHolder> {
@@ -122,10 +139,9 @@ public class CoursesListFragment extends Fragment {
         @Override
         public void onBindViewHolder(ViewHolder viewHolder, int i) {
             Course currCourse = allCourses.get(i);
-
             viewHolder.mImageView.setImageUrl(currCourse.getImage());
             viewHolder.mTextView.setText(currCourse.getTitle());
-            Log.d(LOG_TAG, "CourseAdapter#onBindViewHolder");
+            Log.d(LOG_TAG, "CourseAdapter#onBindViewHolder  : Image URL :  " + currCourse.getImage());
         }
 
         @Override
@@ -178,8 +194,84 @@ public class CoursesListFragment extends Fragment {
                     }
                 }
 
+
             });
 
+        }
+    }
+
+    public class FetchWeatherTask extends AsyncTask<OkHttpClient,Void,String> {
+
+        ProgressDialog progressDialog;
+
+        @Override
+        protected String doInBackground(OkHttpClient... params) {
+
+            publishProgress();
+            Request request = new Request.Builder()
+                    .url(UdacityRestClass.getAbsoluteUrl("courses"))
+                    .build();
+            try {
+                Response response = params[0].newCall(request).execute();
+
+                Log.d(LOG_TAG,"response : " + response);
+                return response.body().string();
+
+            }catch (IOException e) {
+
+                return null;
+            }
+
+
+
+        }
+
+        @Override
+        protected void onProgressUpdate(Void... values) {
+            super.onProgressUpdate(values);
+
+            progressDialog = new ProgressDialog(getActivity());
+            progressDialog.setMessage("Fetching data from Udacity!");
+            progressDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+            progressDialog.setCancelable(true);
+            progressDialog.setIndeterminate(true);
+            progressDialog.show();
+
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+
+            progressDialog.dismiss();
+
+            if(s != null) {
+
+                try {
+                    JSONObject response = new JSONObject(s);
+                    JSONArray courses = response.getJSONArray("courses");
+                    GsonBuilder builder = new GsonBuilder();
+                    builder = builder.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES);
+                    Gson gson = builder.create();
+
+
+                    mAllCourses = new ArrayList<Course>(Arrays.asList(gson.fromJson(courses.toString(), Course[].class)));
+
+                    mAdapter = new CourseAdapter(mAllCourses);
+                    mRecyclerView.setAdapter(mAdapter);
+                    //mAdapter.notifyDataSetChanged();
+
+
+
+                    //TextView txtView = (TextView) getActivity().findViewById(R.id.main_text);
+                    //txtView.setText(allCourses[1].getShortSummary());
+
+                    Log.d(LOG_TAG, courses.toString());
+
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+            super.onPostExecute(s);
         }
     }
 

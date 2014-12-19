@@ -13,7 +13,7 @@ public class UdacityRestClass {
     private static final String BASE_URL = "http://www.udacity.com/public-api/v0/";
     private static final AsyncHttpClient client = new AsyncHttpClient();
 
-    private static String getAbsoluteUrl(String url) {
+    public static String getAbsoluteUrl(String url) {
         return BASE_URL + url;
     }
 
